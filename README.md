@@ -1,21 +1,47 @@
 # EveryIBus
 
-A lightweight, reliable iBUS telemetry library specifically designed for Arduino Nano Every (ATmega4809).
+A lightweight, reliable iBUS telemetry library specifically designed for **Arduino Nano Every** (ATmega4809).
 
-## Why EveryIBus?
+## 🎯 Why EveryIBus?
 
-The popular IBusBM library has timing issues on Arduino Nano Every due to differences in the ATmega4809's timer architecture compared to the ATmega328P. EveryIBus solves these problems with a direct, interrupt-friendly implementation that works reliably on the Nano Every.
+The popular IBusBM library has timing issues on Arduino Nano Every due to differences in the ATmega4809's timer architecture. EveryIBus solves these problems with a direct, interrupt-friendly implementation that **just works** on the Nano Every.
 
-## Features
+## ✨ Features
 
 - ✅ **Reliable on Nano Every** - No timer interrupt conflicts
-- ✅ **Simple API** - Easy to integrate into existing projects  
+- ✅ **Super Simple API** - Four-line setup for multiple sensors
+- ✅ **Real-world units** - Use volts, celsius, RPM directly  
 - ✅ **Interrupt-friendly** - Works alongside pin interrupts and other time-sensitive code
-- ✅ **Multiple sensor types** - Voltage, temperature, current, RPM, etc.
-- ✅ **Debug support** - Built-in diagnostic output
+- ✅ **Multiple sensors** - Up to 4 sensors automatically managed
+- ✅ **Zero configuration** - Works out-of-the-box with sensible defaults
 - ✅ **Lightweight** - Minimal memory footprint
+- ✅ **Debug support** - Built-in diagnostic output
 
-## Hardware Setup
+## 🚀 Quick Start
+
+```cpp
+#include <EveryIBus.h>
+
+EveryIBus ibus;
+
+void setup() {
+  ibus.begin();  // That's it!
+}
+
+void loop() {
+  ibus.update();  // Handle protocol
+  
+  // Set sensor values with real-world units
+  ibus.setInternalVoltage(5.08);    // 5.08V
+  ibus.setExternalVoltage(12.41);   // 12.41V  
+  ibus.setTemperature(21.12);       // 21.12°C
+  ibus.setRPM(4294);                // 4294 RPM
+}
+```
+
+That's it! Your FS-i6 transmitter will show **IntV**, **ExtV**, **Temp**, and **RPM** with the values you set.
+
+## 🔌 Hardware Setup
 
 ```
 Arduino Nano Every        FlySky FS-iA6B
@@ -26,106 +52,169 @@ Arduino Nano Every        FlySky FS-iA6B
 └─────────────────┘       └──────────────┘
 ```
 
-**Important:** Use a 1kΩ resistor on the TX line to prevent damage.
+**Important:** Use a 1kΩ resistor on the TX line (D1) to prevent damage.
 
-## Quick Start
+## 🎮 Compatible Hardware
 
+- ✅ **Arduino Nano Every** (ATmega4809) - Primary target
+- ✅ **FlySky FS-iA6B** receiver - Tested and confirmed
+- ✅ **FlySky FS-i6/FS-i6X** transmitter - Shows all sensor types
+- ❓ Other megaAVR boards - Should work but untested
+
+## 📊 Supported Sensors
+
+| Sensor Type | Function | Units | Transmitter Display |
+|-------------|----------|-------|-------------------|
+| Internal Voltage | `setInternalVoltage(5.08)` | Volts | IntV: 5.08V |
+| External Voltage | `setExternalVoltage(12.41)` | Volts | ExtV: 12.41V |
+| Temperature | `setTemperature(21.12)` | Celsius | Temp: 21.1°C |
+| RPM | `setRPM(4294)` | RPM | RPM: 4294 |
+
+## 📚 Examples
+
+### Basic Usage
 ```cpp
 #include <EveryIBus.h>
 
 EveryIBus ibus;
 
 void setup() {
-  // Initialize iBUS on Serial1 as voltage sensor
-  ibus.begin(Serial1, IBUS_SENSOR_INTERNAL_VOLTAGE);
+  ibus.begin();
 }
 
 void loop() {
-  // Handle iBUS protocol (call regularly!)
   ibus.update();
   
-  // Update sensor value
-  ibus.setSensorValue(1234); // 12.34V
-  
-  // Your other code here...
+  // Your sensor readings here
+  float batteryVoltage = analogRead(A0) * (5.0 / 1023.0);
+  ibus.setInternalVoltage(batteryVoltage);
 }
 ```
 
-## Sensor Types
+### With Pin Interrupts
+```cpp
+#include <EveryIBus.h>
 
-| Constant | Description | Units |
-|----------|-------------|-------|
-| `IBUS_SENSOR_INTERNAL_VOLTAGE` | Internal voltage | 0.01V (1234 = 12.34V) |
-| `IBUS_SENSOR_EXTERNAL_VOLTAGE` | External voltage | 0.01V |
-| `IBUS_SENSOR_TEMPERATURE` | Temperature | 0.1°C (0 = -40°C) |
-| `IBUS_SENSOR_CURRENT` | Current | 0.01A |
-| `IBUS_SENSOR_RPM` | RPM | 1 RPM |
-| `IBUS_SENSOR_FUEL` | Fuel percentage | 1% (0-100) |
+EveryIBus ibus;
+volatile int rpmCounter = 0;
 
-## API Reference
+void setup() {
+  ibus.begin();
+  attachInterrupt(digitalPinToInterrupt(2), rpmISR, RISING);
+}
 
-### `EveryIBus()`
-Constructor. Creates an EveryIBus instance.
+void loop() {
+  ibus.update();  // Non-blocking, interrupt-safe
+  
+  // Calculate RPM from interrupt counter
+  static uint32_t lastRpmCalc = 0;
+  if (millis() - lastRpmCalc > 1000) {
+    uint16_t rpm = rpmCounter * 60;  // Convert to RPM
+    ibus.setRPM(rpm);
+    rpmCounter = 0;
+    lastRpmCalc = millis();
+  }
+}
 
-### `void begin(HardwareSerial& serial, uint8_t sensorType)`
-Initialize the library.
-- `serial`: Hardware serial port (use `Serial1` for D0/D1)
-- `sensorType`: One of the `IBUS_SENSOR_*` constants
+void rpmISR() {
+  rpmCounter++;
+}
+```
 
-### `void update()`
-Handle iBUS protocol. **Must be called regularly in loop().**
+### Real Sensor Integration (INA260)
+```cpp
+#include <EveryIBus.h>
+#include <Adafruit_INA260.h>
 
-### `void setSensorValue(uint16_t value)`
-Set the sensor value in appropriate units for the sensor type.
+EveryIBus ibus;
+Adafruit_INA260 ina260 = Adafruit_INA260();
 
-### `bool isDiscovered()`
-Returns true if the sensor has been discovered by the receiver.
+void setup() {
+  ibus.begin();
+  ina260.begin();
+}
 
-### `uint32_t getPacketCount()`
-Returns the number of packets received from the receiver.
+void loop() {
+  ibus.update();
+  
+  // Read real sensor data
+  float voltage = ina260.readBusVoltage();
+  float current = ina260.readCurrent();
+  
+  // Send to transmitter
+  ibus.setExternalVoltage(voltage);
+  // Convert current to another sensor type if needed
+}
+```
 
-### `uint32_t getResponseCount()`
-Returns the number of responses sent to the receiver.
+## 🛠️ Installation
 
-### `void setDebug(bool enable)`
-Enable/disable debug output to Serial monitor.
+### Arduino Library Manager (Recommended)
+1. Open Arduino IDE
+2. Go to **Sketch → Include Library → Manage Libraries**
+3. Search for "EveryIBus"
+4. Click **Install**
 
-## Examples
+### Manual Installation
+1. Download the latest release from [Releases](../../releases)
+2. Extract to `Arduino/libraries/EveryIBus/`
+3. Restart Arduino IDE
 
-See the `examples/` folder for:
-- **BasicTelemetry** - Simple voltage telemetry
-- **WithInterrupts** - Using iBUS alongside pin interrupts
-- **INA260Example** - Real sensor integration (coming soon)
+### Development Version
+```bash
+cd ~/Arduino/libraries/
+git clone https://github.com/yourusername/EveryIBus.git
+```
 
-## Compatibility
-
-- ✅ Arduino Nano Every (ATmega4809)
-- ✅ FlySky FS-iA6B receiver
-- ✅ FlySky FS-i6/FS-i6X transmitter
-- ❓ Other megaAVR boards (untested)
-
-## Troubleshooting
+## 🐛 Troubleshooting
 
 **No telemetry on transmitter:**
 1. Check wiring (especially the 1kΩ resistor on TX)
-2. Verify GND connection
-3. Enable debug: `ibus.setDebug(true)`
-4. Check Serial monitor for "DISCOVERY [SENT]" messages
+2. Verify ground connection between Arduino and receiver
+3. Enable debug: `ibus.setDebug(true)` and check Serial Monitor
+4. Look for "DISCOVERY [SENT]" messages in debug output
 
 **Irregular telemetry:**
 1. Ensure `ibus.update()` is called frequently in `loop()`
-2. Avoid long delays in main loop
-3. Check for interrupt conflicts
+2. Avoid long `delay()` calls in main loop
+3. Check for interrupt conflicts with other libraries
 
-**Compile errors:**
-1. Ensure library is in `libraries/every-ibus/` folder
-2. Restart Arduino IDE
-3. Select "Arduino Nano Every" as board
+**Compilation errors:**
+1. Ensure you selected "Arduino Nano Every" as the board
+2. Verify library is installed correctly
+3. Restart Arduino IDE
 
-## License
+## 🤝 Contributing
 
-This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
+Contributions are welcome! Please:
 
-## Contributing
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Test thoroughly on Arduino Nano Every hardware
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
-Issues and pull requests welcome! Please test thoroughly on Arduino Nano Every hardware.
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Betaflight project** for iBUS protocol documentation
+- **FlySky community** for protocol reverse engineering  
+- **Arduino community** for continuous support
+- **IBusBM library** authors for inspiration (even though it doesn't work on Nano Every 😅)
+
+## 📞 Support
+
+- 🐛 **Bug reports:** [GitHub Issues](../../issues)
+- 💡 **Feature requests:** [GitHub Issues](../../issues)
+- 📖 **Documentation:** [Wiki](../../wiki)
+- 💬 **Discussions:** [GitHub Discussions](../../discussions)
+
+---
+
+**Made with ❤️ for the Arduino Nano Every community**
+
+*Finally, iBUS telemetry that just works!*
