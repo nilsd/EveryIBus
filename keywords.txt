@@ -1,0 +1,32 @@
+#######################################
+# Syntax Coloring Map For EveryIBus
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+EveryIBus	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+update	KEYWORD2
+setSensorValue	KEYWORD2
+getPacketCount	KEYWORD2
+getResponseCount	KEYWORD2
+isDiscovered	KEYWORD2
+setDebug	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+IBUS_SENSOR_INTERNAL_VOLTAGE	LITERAL1
+IBUS_SENSOR_TEMPERATURE	LITERAL1
+IBUS_SENSOR_RPM	LITERAL1
+IBUS_SENSOR_EXTERNAL_VOLTAGE	LITERAL1
+IBUS_SENSOR_CURRENT	LITERAL1
+IBUS_SENSOR_FUEL	LITERAL1
